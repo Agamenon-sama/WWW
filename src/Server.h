@@ -4,7 +4,9 @@
 
 #include <queue>
 #include <thread>
+#include <mutex>
 #include <vector>
+#include <condition_variable>
 
 class Server {
     public:
@@ -19,12 +21,14 @@ class Server {
         int _clientSocket;
         struct sockaddr_in _serverAddr;
         struct sockaddr_in _clientAddr;
-        std::queue<int*> _requestQueue;
+        std::queue<int> _requestQueue;
         std::vector<std::thread> _threadPool;
         size_t _threadPoolSize;
+        std::mutex _queueMutex;
+        std::condition_variable _cv;
 
-        // void _handleRequest();
+        void _handleRequest();
 };
 
 void handleRequest(std::queue<int*> requestQueue );
-void threadFunction(std::queue<int*> requestQueue);
+// void threadFunction(std::queue<int*> &requestQueue);

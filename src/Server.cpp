@@ -2,7 +2,6 @@
 #include "HTTPHandler.h"
 
 #include <iostream>
-#include <mutex>
 
 #include <string.h>
 #include <sys/socket.h>
@@ -10,7 +9,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-std::mutex queueMutex;
+
 
 Server::Server() {
     // Initilizing everything to 0
@@ -23,7 +22,7 @@ Server::Server() {
     _threadPool.resize(_threadPoolSize); // Set the thread pool size
     for(size_t i = 0; i < _threadPoolSize; i++) {
         // _threadPool[i] = std::thread(handleRequest, _requestQueue);
-        _threadPool[i] = std::thread(threadFunction, _requestQueue);
+        _threadPool[i] = std::thread([this](){_handleRequest();});
     }
 }
 
@@ -73,11 +72,11 @@ void Server::run() {
             std::cout << "Failed to get the IP of the client\n";
         }
 
-        int *pclient = new int;
-        *pclient = _clientSocket;
-        queueMutex.lock();
-        _requestQueue.push(pclient);
-        queueMutex.unlock();
+        // int *pclient = new int;
+        // *pclient = _clientSocket;
+        _queueMutex.lock();
+        _requestQueue.push(_clientSocket);
+        _queueMutex.unlock();
         std::cout << "Pushed request to the queue\n";
 
         // handleRequest(_requestQueue);
@@ -88,31 +87,31 @@ void Server::run() {
 }
 
 
-void threadFunction(std::queue<int*> requestQueue) {
+/*void Server::_handleRequest() {
     while (1) {
-        // queueMutex.lock();
-        if(!requestQueue.empty()){
-            // queueMutex.unlock();
-            handleRequest(requestQueue);
+        if(!_requestQueue.empty()){
+            _queueMutex.lock();
+            handleRequest(_requestQueue);
+            _queueMutex.unlock();
         }
     
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(20ms);
     }
-}
+}*/
 
-void handleRequest(std::queue<int*> requestQueue) {
-    // while(1) {
-        // if(!requestQueue.empty()){
+void Server::_handleRequest() {
+    while(1) {
+        if(!_requestQueue.empty()){
             // Poping the client socket from the queue
-            queueMutex.lock();
-            int *clientSocket = requestQueue.front();
-            requestQueue.pop();
-            queueMutex.unlock();
+            // queueMutex.lock();
+            int clientSocket = _requestQueue.front();
+            _requestQueue.pop();
+            // queueMutex.unlock();
 
             // Receiving request and processing it
             char request[2 * 1024];
-            recv(*clientSocket, request, sizeof(request), 0);
+            recv(clientSocket, request, sizeof(request), 0);
             std::cout << "Client Request : \n" << request << "\n";
 
             HTTPHandler requestHandler;
@@ -121,11 +120,13 @@ void handleRequest(std::queue<int*> requestQueue) {
             std::cout << reply << "\n";
 
             // Sending the reply
-            send(*clientSocket, reply.c_str(), reply.size(), 0);
+            send(clientSocket, reply.c_str(), reply.size(), 0);
 
             // Closing connection
-            close(*clientSocket);
-        // }
+            close(clientSocket);
+        }
 
-    // }
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(20ms);
+    }
 }
