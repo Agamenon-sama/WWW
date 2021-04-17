@@ -76,6 +76,7 @@ void Server::run() {
         // *pclient = _clientSocket;
         _queueMutex.lock();
         _requestQueue.push(_clientSocket);
+        _cv.notify_one();
         _queueMutex.unlock();
         std::cout << "Pushed request to the queue\n";
 
@@ -101,32 +102,34 @@ void Server::run() {
 }*/
 
 void Server::_handleRequest() {
+    std::unique_lock<std::mutex> ulock(_queueMutex, std::defer_lock);
+    int clientSocket = -1;
+
     while(1) {
-        if(!_requestQueue.empty()){
-            // Poping the client socket from the queue
-            // queueMutex.lock();
-            int clientSocket = _requestQueue.front();
-            _requestQueue.pop();
-            // queueMutex.unlock();
+        // Poping the client socket from the queue
+        ulock.lock();
+        _cv.wait(ulock, [this](){ return !_requestQueue.empty();}); // if predicate is true we execute
+        clientSocket = _requestQueue.front();                       // else we wait for notify
+        _requestQueue.pop();
+        ulock.unlock();
 
-            // Receiving request and processing it
-            char request[2 * 1024];
-            recv(clientSocket, request, sizeof(request), 0);
-            std::cout << "Client Request : \n" << request << "\n";
+        // Receiving request and processing it
+        char request[2 * 1024];
+        recv(clientSocket, request, sizeof(request), 0);
+        std::cout << "Client Request : \n" << request << "\n";
 
-            HTTPHandler requestHandler;
-            // std::cout << "Created handler\n";
-            std::string reply = requestHandler.handle(request);
-            std::cout << reply << "\n";
+        HTTPHandler requestHandler;
+        // std::cout << "Created handler\n";
+        std::string reply = requestHandler.handle(request);
+        std::cout << reply << "\n";
 
-            // Sending the reply
-            send(clientSocket, reply.c_str(), reply.size(), 0);
+        // Sending the reply
+        send(clientSocket, reply.c_str(), reply.size(), 0);
 
-            // Closing connection
-            close(clientSocket);
-        }
+        // Closing connection
+        close(clientSocket);
 
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(20ms);
+        // using namespace std::chrono_literals;
+        // std::this_thread::sleep_for(20ms);
     }
 }
