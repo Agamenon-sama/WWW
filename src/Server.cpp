@@ -2,6 +2,8 @@
 #include "HTTPHandler.h"
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include <string.h>
 #include <sys/socket.h>
@@ -12,12 +14,17 @@
 
 
 Server::Server() {
-    // Initilizing everything to 0
+    // Initilizing everything to 0 and port to 8080
     _serverSocket = 0;
     _clientSocket = 0;
     memset(&_serverAddr, 0, sizeof(struct sockaddr_in));
     memset(&_clientAddr, 0, sizeof(struct sockaddr_in));
     _threadPoolSize = 8;
+    _portNumber = 8080;
+
+    if(!_loadConfig()) {
+        std::cerr << "\e[33mWarning : The server will start with default configuration\n\e[0m";
+    }
 
     _threadPool.resize(_threadPoolSize); // Set the thread pool size
     for(size_t i = 0; i < _threadPoolSize; i++) {
@@ -42,7 +49,7 @@ bool Server::init() {
 
     // Set server address
     _serverAddr.sin_family = AF_INET;
-    _serverAddr.sin_port = htons(8080);
+    _serverAddr.sin_port = htons(_portNumber);
     _serverAddr.sin_addr.s_addr = INADDR_ANY;
 
     // Binding the socket to the address
@@ -88,18 +95,55 @@ void Server::run() {
 }
 
 
-/*void Server::_handleRequest() {
-    while (1) {
-        if(!_requestQueue.empty()){
-            _queueMutex.lock();
-            handleRequest(_requestQueue);
-            _queueMutex.unlock();
-        }
-    
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(20ms);
+bool Server::_loadConfig() {
+    std::fstream configFile;
+    configFile.open("config", std::ios::in);
+    if(!configFile.is_open()) {
+        std::cerr << "\e[33mWarning : Failed to load configuration file\n\e[0m";
+
+        return false;
     }
-}*/
+
+    int lineNum = 1;
+    std::string line;
+    std::string key;
+    std::string value;
+    while(getline(configFile, line)) {
+        // key << line;
+        // value << line;
+
+
+        std::stringstream ssline(line);
+        std::getline(ssline, key, '=');
+        std::getline(ssline, value);
+
+        std::cout << "The key is " << key << "\n";
+        std::cout << "The value is " << value << "\n";
+
+        if(key[0] == '#') {
+            lineNum++;
+            continue;
+        } else if(key == "pool_size") {
+            try {
+                _threadPoolSize = std::stoi(value);
+            } catch(std::exception &e) {
+                std::cerr << "\e[31mError : Can't set the pool size " << e.what() << "\e[0m";
+            }
+        } else if(key == "port_number") {
+            try {
+                _portNumber = std::stoi(value);
+            } catch(std::exception &e) {
+                std::cerr << "\e[31mError : Can't set the port number " << e.what() << "\e[0m";
+            }
+        } else {
+            std::cerr << "\e[33mWarning : Invalid configuration key at line " << lineNum << "\n\e[0m";
+        }
+        lineNum++;
+    }
+    configFile.close();
+
+    return true;
+}
 
 void Server::_handleRequest() {
     std::unique_lock<std::mutex> ulock(_queueMutex, std::defer_lock);

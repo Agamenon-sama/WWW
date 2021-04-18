@@ -19,6 +19,7 @@ class Server {
     private:
         int _serverSocket;
         int _clientSocket;
+        uint16_t _portNumber;
         struct sockaddr_in _serverAddr;
         struct sockaddr_in _clientAddr;
         std::queue<int> _requestQueue;
@@ -28,6 +29,7 @@ class Server {
         std::condition_variable _cv;
 
         void _handleRequest();
+        bool _loadConfig();
 };
 
 void handleRequest(std::queue<int*> requestQueue );
