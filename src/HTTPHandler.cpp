@@ -5,17 +5,11 @@
 #include <fstream>
 #include <iostream>
 
-HTTPHandler::HTTPHandler(/* args */) {
-}
 
-HTTPHandler::~HTTPHandler() {
-}
-
-std::string HTTPHandler::handle(const std::string &request) {
+std::string HTTPHandler::handle(const std::string &request) const{
     /** This function makes all the necessary calls to
      *  process the http request and return the response
      */
-    // _parse(request);
 
     // Parsing
     std::stringstream reqStream(request);
@@ -27,13 +21,12 @@ std::string HTTPHandler::handle(const std::string &request) {
     std::getline(requestLine, method, ' ');
 
     if(method == "GET") {
-        // TODO: impliment GET method
         std::string url;
         std::getline(requestLine, url, ' ');
         
         std::string version;
         std::getline(requestLine, version, ' ');
-        if(version != "HTTP/1.1\r") { // if the version is neither 1.1 or 1.0
+        if(version != "HTTP/1.1\r") { // if the version is not 1.1
             std::cout << version << "\n";
             std::string response = "HTTP/1.1 505 HTTP Version Not Supported\r\nConnection: close\r\n";
             return response;
@@ -77,13 +70,14 @@ std::string HTTPHandler::handle(const std::string &request) {
     }
 }
 
-std::string HTTPHandler::_notImplimented() {
+std::string HTTPHandler::_notImplimented() const{
     /** Returns HTTP 501 status (I feel I'm gonna need this a lot) */
+
     std::string response = "HTTP/1.1 501 Not Implemented\r\nConnection: close\r\n\r\n";
     return response;
 }
 
-std::string HTTPHandler::_head() {
+std::string HTTPHandler::_head() const{
     std::string response = "HTTP/1.1 200 OK\r\n\
 Connection: close\r\n\
 Server: WWW/1.0 (Ubuntu)\r\n\
@@ -93,7 +87,9 @@ Date: ";
     return response;
 }
 
-std::string HTTPHandler::_getDate() {
+std::string HTTPHandler::_getDate() const{
+    /** Returns the date in the format WWW, DD MMM YYYY HH:MM:SS */
+
     std::time_t rawTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::string date = ctime(&rawTime);
     std::string formatedDate = date.substr(0, 3) + ", " + date.substr(8, 3) + date.substr(4, 4) + date.substr(20, 4)

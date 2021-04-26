@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 #include <string.h>
 #include <sys/socket.h>
@@ -14,26 +15,25 @@
 
 
 Server::Server() {
-    // Initilizing everything to 0 and port to 8080
+    // Initilizing everything to the default settings
     _serverSocket = 0;
     _clientSocket = 0;
     memset(&_serverAddr, 0, sizeof(struct sockaddr_in));
     memset(&_clientAddr, 0, sizeof(struct sockaddr_in));
     _threadPoolSize = 8;
     _portNumber = 8080;
+    _backlogSize = 16;
 
     if(!_loadConfig()) {
         std::cerr << "\e[33mWarning : The server will start with default configuration\n\e[0m";
     }
+    std::cout << "Port number : " << _portNumber << "\n";
+    std::cout << "Backlog size : " << _backlogSize << "\n";
 
     _threadPool.resize(_threadPoolSize); // Set the thread pool size
     for(size_t i = 0; i < _threadPoolSize; i++) {
-        // _threadPool[i] = std::thread(handleRequest, _requestQueue);
         _threadPool[i] = std::thread([this](){_handleRequest();});
     }
-}
-
-Server::~Server() {
 }
 
 bool Server::init() {
@@ -59,7 +59,7 @@ bool Server::init() {
     }
 
     // Setting the socket to passive
-    listen(_serverSocket, 5);
+    listen(_serverSocket, _backlogSize);
 
     return true;
 }
@@ -70,6 +70,9 @@ void Server::run() {
         // Accept the connection
         socklen_t peerAddrSize = sizeof(_clientAddr);
         _clientSocket = accept(_serverSocket, (struct sockaddr*) &_clientAddr, &peerAddrSize);
+        time_t acceptTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        std::string acceptTime_s = ctime(&acceptTime);
+        std::cout << acceptTime_s.substr(11, 8) << " :: ";
 
         // Displaying the IP of the peer app
         char peerIP[INET_ADDRSTRLEN] = {0};
@@ -79,23 +82,20 @@ void Server::run() {
             std::cout << "Failed to get the IP of the client\n";
         }
 
-        // int *pclient = new int;
-        // *pclient = _clientSocket;
         _queueMutex.lock();
         _requestQueue.push(_clientSocket);
         _cv.notify_one();
         _queueMutex.unlock();
         std::cout << "Pushed request to the queue\n";
-
-        // handleRequest(_requestQueue);
-        
-        // Close connection
-        // close(_clientSocket);
     }
 }
 
 
 bool Server::_loadConfig() {
+    /** Loads the configuration file and sets
+     * the appropriate properties accordingly
+     */
+
     std::fstream configFile;
     configFile.open("config", std::ios::in);
     if(!configFile.is_open()) {
@@ -109,16 +109,9 @@ bool Server::_loadConfig() {
     std::string key;
     std::string value;
     while(getline(configFile, line)) {
-        // key << line;
-        // value << line;
-
-
         std::stringstream ssline(line);
         std::getline(ssline, key, '=');
         std::getline(ssline, value);
-
-        std::cout << "The key is " << key << "\n";
-        std::cout << "The value is " << value << "\n";
 
         if(key[0] == '#') {
             lineNum++;
@@ -135,6 +128,12 @@ bool Server::_loadConfig() {
             } catch(std::exception &e) {
                 std::cerr << "\e[31mError : Can't set the port number " << e.what() << "\e[0m";
             }
+        } else if(key == "backlog_size") {
+            try {
+                _backlogSize = std::stoi(value);
+            } catch(std::exception &e) {
+                std::cerr << "\e[31mError : Can't set the backlog size " << e.what() << "\e[0m";
+            } 
         } else {
             std::cerr << "\e[33mWarning : Invalid configuration key at line " << lineNum << "\n\e[0m";
         }
@@ -146,6 +145,10 @@ bool Server::_loadConfig() {
 }
 
 void Server::_handleRequest() {
+    /** Reads from the request queue and creats and HTTPHandler
+     * to handle the request
+     */
+
     std::unique_lock<std::mutex> ulock(_queueMutex, std::defer_lock);
     int clientSocket = -1;
 
@@ -172,8 +175,5 @@ void Server::_handleRequest() {
 
         // Closing connection
         close(clientSocket);
-
-        // using namespace std::chrono_literals;
-        // std::this_thread::sleep_for(20ms);
     }
 }

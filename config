@@ -1,3 +1,4 @@
 # Config file example
-pool_size=4
-port_number=8081
+pool_size=16
+port_number=8080
+backlog_size=64

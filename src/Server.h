@@ -11,7 +11,6 @@
 class Server {
     public:
         Server();
-        ~Server();
 
         bool init();
         void run();
@@ -20,6 +19,7 @@ class Server {
         int _serverSocket;
         int _clientSocket;
         uint16_t _portNumber;
+        uint32_t _backlogSize;
         struct sockaddr_in _serverAddr;
         struct sockaddr_in _clientAddr;
         std::queue<int> _requestQueue;
@@ -31,6 +31,3 @@ class Server {
         void _handleRequest();
         bool _loadConfig();
 };
-
-void handleRequest(std::queue<int*> requestQueue );
-// void threadFunction(std::queue<int*> &requestQueue);
