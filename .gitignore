@@ -1,0 +1,6 @@
+.vscode/
+
+server
+server_d
+
+build/*.o
